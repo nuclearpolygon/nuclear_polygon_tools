@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<shelfDocument>
+  <!-- This file contains definitions of shelves, toolbars, and tools.
+ It should not be hand-edited when it is being used by the application.
+ Note, that two definitions of the same element are not allowed in
+ a single file. -->
+
+  <tool name="adjust_fnum" label="Adjust Frame Number" icon="PLASMA_App">
+    <script scriptType="python"><![CDATA[import os, glob, re, shutil
+from pathlib import Path
+directory = Path(hou.ui.selectFile(start_directory=hou.text.expandString("$HIP"), title="Choose directory", collapse_sequences=True, file_type=hou.fileType.Directory, multiple_select=True, width=0, height=0))
+input = hou.ui.readInput("Start at frame", buttons=('OK',), initial_contents="101")
+start_at = input[1]
+if input[0] == 0:
+    #os.chdir(directory)
+    files = list(directory.glob("*.jpg"))
+    files.extend(list(directory.glob("*.exr")))
+    files.extend(list(directory.glob("*.png")))
+    
+    for file in files:
+        name = file.name
+        
+        
+        match = re.search("\.[0-9]*\.",name).group(0)
+        fill = len(match[1:-1])
+        fnum = int(match[1:-1]) + int(start_at) - 1 
+        newfnum = str(fnum).zfill(fill)
+        newname = re.sub("\.[0-9]*\.", ".{}.".format(newfnum), name)
+        newfile = os.path.join(directory, newname)
+        #print(newfile)
+        #p = Path(file)
+        file.rename(newfile)
+        #shutil.copyfile(file,os.path.join((directory,"renamed", newfile)))
+        #os.rename(name,newname)
+        print(name, newname)]]></script>
+  </tool>
+</shelfDocument>
