@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<shelfDocument>
+  <!-- This file contains definitions of shelves, toolbars, and tools.
+ It should not be hand-edited when it is being used by the application.
+ Note, that two definitions of the same element are not allowed in
+ a single file. -->
+
+  <tool name="cp_megascaps_preview" label="cp megascaps preview" icon="PLASMA_App">
+    <script scriptType="python"><![CDATA[import os, re, shutil
+path = hou.ui.selectFile(file_type=hou.fileType.Directory)
+os.chdir(path)
+for d in os.listdir('.'):
+    os.chdir(os.path.join(path,d))
+    if os.path.isdir(os.getcwd()):
+        for f in os.listdir('.'):
+            match = re.search(r'.*_Preview.png', f)
+            if match:
+                file = os.path.join(os.getcwd(),f)
+                if not os.path.isdir(file):
+                    shutil.copy2(file, path)]]></script>
+  </tool>
+</shelfDocument>
