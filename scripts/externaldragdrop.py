@@ -94,6 +94,21 @@ def createMaterial(files, meta, cwd, path, pos, mattype):
 
     return shader, pos
 
+def prepareMS(path, i, pos, cwd, mattype):
+    os.chdir(path)
+    files = os.listdir('.')
+    meta = None
+    for f in files:
+        if f.endswith('.json'):
+            with open(f, 'r') as js:
+                meta = json.loads(js.read())
+    if meta is not None:
+        if 'surface' in meta['tags'] or 'surface' in meta['categories'] \
+        or 'decal' in meta['tags']:
+            
+
+            shader ,pos = createMaterial(files, meta, cwd, path, pos, mattype)
+    return pos
 
 def dropAccept(file_list):
     if len(file_list) == 1 and os.path.splitext(file_list[0])[1] == ".hip":
@@ -103,22 +118,28 @@ def dropAccept(file_list):
     if isinstance(panetab, hou.NetworkEditor):
         pos = panetab.cursorPosition()
         cwd = panetab.pwd()
+        types = ('Principled', 'Mtlx', 'Redshift')
         for i, path in enumerate(file_list):
             if os.path.isdir(path):
-                os.chdir(path)
-                files = os.listdir('.')
-                meta = None
-                for f in files:
-                    if f.endswith('.json'):
-                        with open(f, 'r') as js:
-                            meta = json.loads(js.read())
-                if meta is not None:
-                    if 'surface' in meta['tags'] or 'surface' in meta['categories'] \
-                    or 'decal' in meta['tags']:
-                        types = ('Principled', 'Mtlx', 'Redshift')
-                        if i == 0:
-                            mode = hou.ui.displayMessage('Choose type', types)
-                            mattype = types[mode]
-                        shader ,pos = createMaterial(files, meta, cwd, path, pos, mattype)
+                if i == 0:
+                    mode = hou.ui.displayMessage('Choose type', types)
+                    mattype = types[mode]
+                pos = prepareMS(path, i, pos, cwd, mattype)
+
+            elif re.search(r'.*_Preview.png', path):
+                if i == 0:
+                    mode = hou.ui.displayMessage('Choose type', types)
+                    mattype = types[mode]
+                br = 1
+                base, name = os.path.split(path)
+                pattern = re.sub(r'_\w*_Preview.png', '.*', name)
+                for d in os.listdir(base):
+                    if os.path.isdir(os.path.join(base,d)) \
+                        and re.search(pattern, d) and br:
+                        pos = prepareMS(os.path.join(base,d), i, pos, cwd, mattype)
+                        br = 0
+
+
+
 
     return True
