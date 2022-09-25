@@ -4,10 +4,10 @@ import toolutils
 import re
 import json
 
-def createMaterial(files, meta, cwd, path, pos, mattype):
+def createMaterial(files, meta, cwd, path, pos, mattype, use_meta=True):
     ms_principled = {'Albedo': 'basecolor', 'AO': 'occlusion', 'Specular': 'reflect', 'Displacement': 'dispTex', \
     'Normal': 'baseNormal', 'Bump': 'coatBump_bumpTexture', 'Roughness': 'rough', 'Transmission': 'transparency', 'Metalness': 'metallic', \
-    'Opacity': 'opaccolor', 'Translucency': 'transcolor', 'Disp_scale': 'dispTex_scale', 'Tile': 'tiling'}
+    'Opacity': 'opaccolor', 'Translucency': 'transcolor', 'Disp_scale': 'dispTex_scale', 'Tile': 'uvscale'}
 
     ms_mtlx = {'Albedo': 'basecolor', 'AO': 'occlusion', 'Specular': 'specular', 'Displacement': 'displacement', \
     'Normal': 'normal', 'Bump': 'bump', 'Roughness': 'rough', 'Transmission': 'transmission', 'Metalness': 'metallic', \
@@ -21,7 +21,13 @@ def createMaterial(files, meta, cwd, path, pos, mattype):
     scan = (1,1)
 
     # create or find matnet
-    if not (cwd.type().name() == 'matnet' or cwd.type().name() == 'materiallibrary'):
+    if cwd.type().name() == 'matnet' \
+        or cwd.type().name() == 'materiallibrary' \
+        or cwd.type().name() == 'mat' \
+        or (cwd.type().name() == 'subnet' and cwd.parent().type().name() == 'materiallibrary'):
+        matnet = cwd
+
+    else:
         matnets = [m for m in cwd.children() if m.type().name() == 'matnet']
         if len(matnets) > 0:
             matnet = matnets[0]
@@ -29,24 +35,26 @@ def createMaterial(files, meta, cwd, path, pos, mattype):
         else:
             matnet = cwd.createNode('matnet')
             hou.setPwd(matnet)
-    else:
-        matnet = cwd
 
     # get textures 
     jpgs = [f for f in files if f.endswith('.jpg')]
     exrs = [f for f in files if f.endswith('.exr')]
     
     # get metadata
-    try:
-        data = meta['meta']
-        for val in data:
-            if val['key'] == 'height':
-                height = float(val['value'].split(' ')[0])
-            if val['key'] == 'scanArea':
-                area_str = val['value'][:3]
-                scan = (float(area_str[0]), float(area_str[2]))
-    except KeyError:
-        pass
+    if use_meta:
+        try:
+            data = meta['meta']
+            for val in data:
+                if val['key'] == 'height':
+                    height = float(val['value'].split(' ')[0])
+                if val['key'] == 'scanArea':
+                    area_str = val['value'].split(' ')[0].split('x')
+                    scan = (float(area_str[0]), float(area_str[1]))
+        except KeyError:
+            pass
+    else:
+        height = .01
+        scan = (1.0, 1.0)
 
     # create shader
     shader = matnet.createNode(shader_type[mattype],os.path.basename(path))
@@ -55,11 +63,14 @@ def createMaterial(files, meta, cwd, path, pos, mattype):
 
     # set metadata to parms
     shader.parm(ms_args['Disp_scale']).set(height)
+    shader.parmTuple(ms_args['Tile']).set(scan)
 
     # if principled modify some defaults
     if mattype == 'Principled':
         shader.parmTuple('basecolor').set((1,1,1))
         shader.parm('dispTex_offset').set(0)
+    if mattype == 'Mtlx':
+        shader.setMaterialFlag(True)
 
 
     #set textures
@@ -94,6 +105,58 @@ def createMaterial(files, meta, cwd, path, pos, mattype):
 
     return shader, pos
 
+def createAsset(files, meta, cwd, path, pos, mattype):
+    legacy = True
+    sop = None
+    matnet = None
+    if cwd.type().name() == 'obj':
+        sop = cwd.createNode('geo', os.path.basename(path))
+        matnet = sop.createNode('matnet')
+    elif cwd.childTypeCategory().name() == 'Sop':
+        sop = cwd.createNode('subnet', os.path.basename(path))
+        matnet = sop.createNode('matnet')
+    elif cwd.childTypeCategory().name() == 'Lop':
+        legacy = False
+        comp_geo = cwd.createNode('componentgeometry', os.path.basename(path))
+        comp_mat = comp_geo.createOutputNode('componentmaterial')
+        comp_out = comp_mat.createOutputNode('componentoutput')
+        mat_lib = cwd.createNode('materiallibrary')
+        comp_mat.setInput(1, mat_lib)
+
+        fbx = [f for f in files if f.endswith('.fbx')]
+        comp_geo.parm('sourceinput').set(1)
+        comp_geo.parm('source').set(os.path.abspath(fbx[0]))
+        comp_geo.parm('sourceproxy').set(os.path.abspath(fbx[-1]))
+        comp_geo.parm('sourcesimproxy').set(os.path.abspath(fbx[-1]))
+        mat_lib.parm('matpathprefix').set('/ASSET/mtl/')
+        mat, p = createMaterial(files, meta, mat_lib, path, pos, mattype, use_meta=False)
+        cwd.layoutChildren((comp_geo, comp_mat, mat_lib, comp_out))
+
+    if legacy:
+        fbx = [f for f in files if f.endswith('.fbx')]
+        sop.setPosition(pos)
+        mat, p = createMaterial(files, meta, matnet, path, pos, mattype, use_meta=False)
+        layout = []
+        for fb in fbx:
+            file_node = sop.createNode('file', os.path.basename(fb))
+            file_node.parm('file').set(os.path.abspath(fb))
+            xform = file_node.createOutputNode('xform')
+            xform.parm('scale').set(0.01)
+            apply_mat = xform.createOutputNode('material')
+            relpath = hou.text.relpath(mat.path(), apply_mat.path())
+            relpath = '.' + relpath if relpath.startswith('./') else relpath
+            apply_mat.parm('shop_materialpath1').set(relpath)
+            layout += [file_node, xform, apply_mat]
+            if 'LOD0' in fb:
+                apply_mat.setDisplayFlag(True)
+                apply_mat.setRenderFlag(True)
+        sop.layoutChildren(layout)
+        pos = hou.Vector2(pos.x() + sop.size().x()*2, pos.y())
+    return pos
+
+
+
+
 def prepareMS(path, i, pos, cwd, mattype):
     os.chdir(path)
     files = os.listdir('.')
@@ -105,9 +168,9 @@ def prepareMS(path, i, pos, cwd, mattype):
     if meta is not None:
         if 'surface' in meta['tags'] or 'surface' in meta['categories'] \
         or 'decal' in meta['tags']:
-            
-
             shader ,pos = createMaterial(files, meta, cwd, path, pos, mattype)
+        elif meta['semanticTags']['asset_type'] == '3D asset':
+            pos = createAsset(files, meta, cwd, path, pos, mattype)
     return pos
 
 def dropAccept(file_list):
@@ -132,7 +195,7 @@ def dropAccept(file_list):
                     mattype = types[mode]
                 br = 1
                 base, name = os.path.split(path)
-                pattern = re.sub(r'_\w*_Preview.png', '.*', name)
+                pattern = re.sub(r'_[a-zA-Z0-9]*_Preview.png', '.*', name)
                 for d in os.listdir(base):
                     if os.path.isdir(os.path.join(base,d)) \
                         and re.search(pattern, d) and br:
