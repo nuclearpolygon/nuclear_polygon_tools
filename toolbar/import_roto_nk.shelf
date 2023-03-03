@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<shelfDocument>
+  <!-- This file contains definitions of shelves, toolbars, and tools.
+ It should not be hand-edited when it is being used by the application.
+ Note, that two definitions of the same element are not allowed in
+ a single file. -->
+
+  <tool name="import_roto_nk" label="Import Roto NK" icon="PLASMA_App">
+    <script scriptType="python"><![CDATA[filepath = hou.ui.selectFile(start_directory=hou.text.expandString("$HIP"), pattern="*.nk")
+class Node(object):
+    def __init__(self, name):
+        self.children = {}
+        self.parent = None
+        self.name = name
+        self.npoints = 0
+        self.points = []
+        
+    def traverse(self):
+        print(self.points[:5])
+        for key in self.children.keys():
+            print(key)
+            self.children[key].traverse()
+        
+if filepath != "":
+    
+    with open(filepath, "r") as f:
+        text = f.readlines()
+    data = {}
+    root = Node("root")
+    parent = root
+    tmp = None
+    for i, line in enumerate(text):
+        if "{" in line and "Node:" in line:
+            name = text[i+1][:-2]
+            node = Node(name)
+            parent.children[name] = node
+            tmp = parent
+            parent = node
+        if "{" in line and ("CurveGroup:" in line or "CubicCurve:" in line):
+            name = text[i][:-2]
+            node = Node(name)
+            parent.children[name] = node
+            tmp = parent
+            parent = node
+        if "CubicCurve:" in line:
+            node.npoints = int(text[i+2].split(" ")[-1])
+            pts = text[i+3].split('""')[1:]
+            # print(pts)
+            l = [[float(val) for val in p.split(" ") if val not in ("", "L")] for p in pts]
+
+            
+            node.points = l
+        if "}" in line:
+            parent = tmp
+            
+    root.traverse()
+            
+            ]]></script>
+  </tool>
+</shelfDocument>

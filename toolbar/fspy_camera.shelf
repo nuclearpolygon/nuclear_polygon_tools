@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<shelfDocument>
+  <!-- This file contains definitions of shelves, toolbars, and tools.
+ It should not be hand-edited when it is being used by the application.
+ Note, that two definitions of the same element are not allowed in
+ a single file. -->
+
+  <tool name="fspy_camera" label="fSpy Cam" icon="OBJ_camera">
+    <script scriptType="python"><![CDATA[import json
+from pathlib import Path
+
+j_file_path = hou.ui.selectFile(start_directory='$HIP', pattern='*.json')
+j_file_path = hou.text.expandString(j_file_path)
+with open(j_file_path, 'r') as f:
+    cam_parms = json.loads(f.read())
+tabs = hou.ui.currentPaneTabs()
+network = None
+for tab in tabs:
+    if isinstance(tab, hou.NetworkEditor):
+        network = tab
+        break
+if network is not None:
+    node = network.pwd()
+    parents = Path(node.path()).parents
+    if len(parents) > 2:
+        parent = hou.node(str(Path(node.path()).parents[1]))
+    else:
+        parent = node
+    cam = parent.createNode('camera')
+    xform = hou.Matrix4(cam_parms['cameraTransform']['rows'])
+    rsts = xform.transposed().explode()
+    
+    cam.parmTuple('t').set(rsts['translate'])
+    cam.parmTuple('r').set(rsts['rotate'])
+    ]]></script>
+  </tool>
+</shelfDocument>

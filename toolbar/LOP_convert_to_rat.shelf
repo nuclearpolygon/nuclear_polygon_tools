@@ -5,10 +5,9 @@
  Note, that two definitions of the same element are not allowed in
  a single file. -->
 
-  <toolshelf name="nuclear_polygon" label="Nuclear Polygon">
-    <memberTool name="cp_megascaps_preview"/>
-    <memberTool name="fspy_camera"/>
-    <memberTool name="import_roto_nk"/>
-    <memberTool name="lop_convert_to_rat"/>
-  </toolshelf>
+  <tool name="lop_convert_to_rat" label="LOP Convert to RAT" icon="PLASMA_App">
+    <script scriptType="python"><![CDATA[for node in hou.selectedNodes():
+    prims = node.selectionRule(pattern='%type=Material').expandPaths()
+    ]]></script>
+  </tool>
 </shelfDocument>
