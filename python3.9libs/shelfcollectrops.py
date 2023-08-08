@@ -40,8 +40,7 @@ class TreeNode(object):
         self.__checkTopnet()
         self.childrenTreeNodes = []
         self.childrenSopNodes = self.__findNext(self.sopNode)
-        self.__parentSopNodes = {}
-        self.__findPrev(self.sopNode)
+        self.__parentSopNodes = self.__findPrev(self.sopNode)
         self.__id = id(self)
         
         # self.populateChildren()
@@ -63,9 +62,20 @@ class TreeNode(object):
     def type(self):
         return 'TreeNode'
     
+    def __sopDependents(self, sop_node):
+        deps = sop_node.dependents(include_children=False)
+        found = []
+        for dep in deps:
+            if dep in sop_node.children() or dep == sop_node:
+                continue
+            else:
+                found += [dep]
+        return found + list(sop_node.outputs())
+    
     # find next child sop nodes matching pattern (i.e *filecache*)
     def __findNext(self, sop_node):
-        stack = list(sop_node.outputs())
+        # stack = list(sop_node.outputs())
+        stack = list(self.__sopDependents(sop_node))
         next_sops = []
         while stack:
             current_sop = stack.pop()
@@ -73,7 +83,8 @@ class TreeNode(object):
                 if current_sop not in next_sops:
                     next_sops.append(current_sop)
             else:
-                stack += current_sop.outputs()
+                stack += self.__sopDependents(current_sop)
+
         return next_sops
         # for sop in sop_node.outputs():
         #     if hou.text.patternMatch(self.pattern, sop.type().name()):
@@ -82,15 +93,35 @@ class TreeNode(object):
         #     else:
         #         self.__findNext(sop)
 
+    def __sopReferences(self, sop_node):
+        deps = sop_node.references(include_children=False)
+        found = []
+        for dep in deps:
+            if dep in sop_node.children() or dep == sop_node:
+                continue
+            else:
+                found += [dep]
+        return found + list(sop_node.inputs())
+
     # find previous parent sop nodes matching pattern (i.e *filecache*)
     def __findPrev(self, sop_node):
-        for sop in sop_node.inputs():
-            if hou.text.patternMatch(self.pattern, sop.type().name()):
-                if sop not in self.__parentSopNodes:
-                    self.__parentSopNodes[sop.name()] = sop
+        # for sop in sop_node.inputs():
+        #     if hou.text.patternMatch(self.pattern, sop.type().name()):
+        #         if sop not in self.__parentSopNodes:
+        #             self.__parentSopNodes[sop.name()] = sop
+        #     else:
+        #         self.__findPrev(sop)
+        stack = list(self.__sopReferences(sop_node))
+        prev_sops = {}
+        while stack:
+            current_sop = stack.pop()
+            if hou.text.patternMatch(self.pattern, current_sop.type().name()):
+                if current_sop not in prev_sops:
+                    prev_sops[current_sop.name()] = current_sop
             else:
-                self.__findPrev(sop)
-
+                stack += self.__sopReferences(current_sop)
+        return prev_sops
+    
     def __isInTree(self, sop_node):
         queue = list(self.childrenTreeNodes)
         while queue:
