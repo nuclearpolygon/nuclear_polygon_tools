@@ -1,13 +1,3 @@
-import ptvsd
-
-# allow other computers to attach to ptvsd at this IP address and port, using the password
-try:
-    ptvsd.enable_attach(address = ('localhost', 5678))
-    print("Not attached already, attaching…")
-except ptvsd.AttachAlreadyEnabledError:
-    print("Attached already, continuing…")
-
-
 import hou
 
 
@@ -275,9 +265,6 @@ class TreeNode(object):
         return next
 
 def collectRops():
-    # pause the program until a remote debugger is attached
-    ptvsd.wait_for_attach()
-
     # find current Sopnet
     tabs = hou.ui.currentPaneTabs()
     current_network = None
