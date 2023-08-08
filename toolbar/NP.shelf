@@ -10,5 +10,6 @@
     <memberTool name="fspy_camera"/>
     <memberTool name="import_roto_nk"/>
     <memberTool name="lop_convert_to_rat"/>
+    <memberTool name="tool_1"/>
   </toolshelf>
 </shelfDocument>
