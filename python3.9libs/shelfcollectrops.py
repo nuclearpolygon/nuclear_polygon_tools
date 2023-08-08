@@ -74,7 +74,6 @@ class TreeNode(object):
     
     # find next child sop nodes matching pattern (i.e *filecache*)
     def __findNext(self, sop_node):
-        # stack = list(sop_node.outputs())
         stack = list(self.__sopDependents(sop_node))
         next_sops = []
         while stack:
@@ -86,12 +85,6 @@ class TreeNode(object):
                 stack += self.__sopDependents(current_sop)
 
         return next_sops
-        # for sop in sop_node.outputs():
-        #     if hou.text.patternMatch(self.pattern, sop.type().name()):
-        #         if sop not in self.childrenSopNodes:
-        #             self.childrenSopNodes.append(sop)
-        #     else:
-        #         self.__findNext(sop)
 
     def __sopReferences(self, sop_node):
         deps = sop_node.references(include_children=False)
@@ -105,12 +98,6 @@ class TreeNode(object):
 
     # find previous parent sop nodes matching pattern (i.e *filecache*)
     def __findPrev(self, sop_node):
-        # for sop in sop_node.inputs():
-        #     if hou.text.patternMatch(self.pattern, sop.type().name()):
-        #         if sop not in self.__parentSopNodes:
-        #             self.__parentSopNodes[sop.name()] = sop
-        #     else:
-        #         self.__findPrev(sop)
         stack = list(self.__sopReferences(sop_node))
         prev_sops = {}
         while stack:
@@ -127,7 +114,6 @@ class TreeNode(object):
         while queue:
             current_node = queue.pop(0)
             if current_node.sopNode == sop_node:
-                # print(f'{current_node} in tree')
                 return current_node
             else:
                 queue += current_node.childrenTreeNodes
@@ -139,9 +125,7 @@ class TreeNode(object):
     # create my own children. Called on initialization so 
     # leads to recursion as far it initializes
     # new TreeNode instances
-    # TODO fix bug: repeated nodes in tree
     def populateChildren(self):
-        # self.animated = self.sopNode.parm('timedependent').eval() == 1 and self.sopNode.parm('trange').eval() == 1
         processed = []
         for sop_node in self.childrenSopNodes:
             self.childrenTreeNodes += [TreeNode(sop_node, pattern=self.pattern, parents=[self], level=self.level+1, 
@@ -161,24 +145,6 @@ class TreeNode(object):
             stack += current_node.childrenTreeNodes
             processed += [current_node]
 
-
-        # for sop_node in self.childrenSopNodes:
-        #     # if I have no parent I'm first, create objects for children anyway
-        #     if self.parentTreeNodes == []:
-        #         self.childrenTreeNodes.append(TreeNode(sop_node, pattern=self.pattern, parents=[self], level=self.level+1, 
-        #             start=self.startTreeNode, topnet=self.topNetwork, output=self.outputNode))
-        #     # if my child sop is alredy in the tree then append pointer to it's TreeNode 
-        #     elif sop_node in self.startTreeNode.traverse(vis=False, traverse_node=TraverseNode.sopNode):
-        #         foundTreeNode = NodeContainer(sop_node)
-        #         self.startTreeNode.traverse(vis=False, find=foundTreeNode)
-        #         foundTreeNode.content.parentTreeNodes.append(self)
-        #         self.childrenTreeNodes.append(foundTreeNode.content)
-        #     # otherwise create TreeNode as my child
-        #     else:
-        #         self.childrenTreeNodes.append(TreeNode(sop_node, pattern=self.pattern, parents=[self], level=self.level+1, 
-        #             start=self.startTreeNode, topnet=self.topNetwork, output=self.outputNode))
-    
-
     def populateTopnet(self):
         # make sure topNode is present
         self.__createTopNode()
@@ -197,7 +163,6 @@ class TreeNode(object):
                 continue
             processed.append(tree_node)
             process_children += tree_node.childrenTreeNodes
-            
             # if no children connect to output
             if tree_node.childrenTreeNodes == [] and tree_node.topNode not in self.outputNode.inputs():
                 self.outputNode.setNextInput(tree_node.topNode)
@@ -347,13 +312,11 @@ def collectRops():
             output = outputs[0]
         # find rops with no ancestors
         firstTreeNodes = []
-        print('\n')
         for rop in rops:
             rop_inputs = [i for i in rop.inputAncestors() if hou.text.patternMatch(rop_pattern, i.type().name())]
             if rop_inputs == []:
                 treeNode = TreeNode(rop, pattern=rop_pattern, topnet=topnet, output=output)
                 firstTreeNodes.append(treeNode)
-                # treeNode.traverse()
                 treeNode.populateChildren()
                 treeNode.populateTopnet()
         output.moveToGoodPosition()
